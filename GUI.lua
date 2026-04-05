@@ -7,7 +7,6 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Stats = game:GetService("Stats")
-local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 if not player then
@@ -15,17 +14,12 @@ if not player then
 	player = Players.LocalPlayer
 end
 
--- Надежный поиск места для GUI (чтобы 100% появлялось в экзекуторах)
-local parentGui
-if gethui then
-	parentGui = gethui()
-else
-	local success = pcall(function() return CoreGui.RobloxGui end)
-	parentGui = success and CoreGui or player:WaitForChild("PlayerGui")
-end
+local parentGui =
+	RunService:IsStudio() and player:WaitForChild("PlayerGui")
+	or (CoreGui:FindFirstChild("RobloxGui") and CoreGui or player:WaitForChild("PlayerGui"))
 
 --========================================================
--- Effects
+-- Effects & Helpers
 --========================================================
 local function addRippleEffect(button)
 	button.ClipsDescendants = true
@@ -168,14 +162,7 @@ XenonLibrary._t = {
 		wrong = "ОШИБКА",
 		openHub = "ОТКРЫТЬ МЕНЮ",
 		closeHub = "ЗАКРЫТЬ МЕНЮ",
-		timeLabel = "Время в игре: %02d:%02d:%02d",
-		homeTab = "Главная",
-		statsTab = "Статистика",
-		settingsTab = "Настройки",
-		homeWelcome = "Добро пожаловать! Выберите вкладку слева.",
-		discordBtn = "Наш Discord сервер",
-		statsInfo = "Здесь может быть любая твоя информация.",
-		killChar = "Убить персонажа",
+		timeLabel = "Время в игре: %02d:%02d:%02d"
 	},
 	EN = {
 		enterKey = "Enter password...",
@@ -186,14 +173,7 @@ XenonLibrary._t = {
 		wrong = "ERROR",
 		openHub = "OPEN MENU",
 		closeHub = "CLOSE MENU",
-		timeLabel = "Time in game: %02d:%02d:%02d",
-		homeTab = "Home",
-		statsTab = "Statistics",
-		settingsTab = "Settings",
-		homeWelcome = "Welcome! Choose a tab on the left.",
-		discordBtn = "Join Discord Server",
-		statsInfo = "Any of your information can be here.",
-		killChar = "Kill Character",
+		timeLabel = "Time in game: %02d:%02d:%02d"
 	},
 }
 
@@ -204,18 +184,19 @@ local function L(keyOrTable)
 	end
 	if type(keyOrTable) == "string" then
 		local dict = XenonLibrary._t[lang]
+		-- Если ключ не найден в словаре, возвращаем сам текст (позволяет писать свой текст в кнопках)
 		return (dict and dict[keyOrTable]) or keyOrTable
 	end
 	return tostring(keyOrTable)
 end
 
 --========================================================
--- Window
+-- Main API: CreateWindow
 --========================================================
 function XenonLibrary:CreateWindow(Config)
 	local Window = {}
 
-	local Title = Config.Name or "Xenon Hub and Salat Hub"
+	local Title = Config.Name or "Xenon Hub"
 	local Subtitle = Config.GameName or "Game"
 	local KeySystem = Config.KeySystem or false
 	local Key = Config.Key or "1"
@@ -291,9 +272,8 @@ function XenonLibrary:CreateWindow(Config)
 	ruBtn.ZIndex = 2
 	ruBtn.Parent = langFrame
 	Instance.new("UICorner", ruBtn).CornerRadius = UDim.new(0, 10)
-	local ruStroke = Instance.new("UIStroke", ruBtn)
-	ruStroke.Color = Color3.fromRGB(255, 255, 255)
-	ruStroke.Transparency = 0.5
+	Instance.new("UIStroke", ruBtn).Color = Color3.fromRGB(255, 255, 255)
+	Instance.new("UIStroke", ruBtn).Transparency = 0.5
 	makeButtonPremium(ruBtn, 0.3, 0.5)
 
 	local enBtn = Instance.new("TextButton")
@@ -310,9 +290,8 @@ function XenonLibrary:CreateWindow(Config)
 	enBtn.ZIndex = 2
 	enBtn.Parent = langFrame
 	Instance.new("UICorner", enBtn).CornerRadius = UDim.new(0, 10)
-	local enStroke = Instance.new("UIStroke", enBtn)
-	enStroke.Color = Color3.fromRGB(255, 255, 255)
-	enStroke.Transparency = 0.5
+	Instance.new("UIStroke", enBtn).Color = Color3.fromRGB(255, 255, 255)
+	Instance.new("UIStroke", enBtn).Transparency = 0.5
 	makeButtonPremium(enBtn, 0.3, 0.5)
 
 	-- Key System Frame
@@ -350,7 +329,6 @@ function XenonLibrary:CreateWindow(Config)
 	keyInput.TextColor3 = theme.text
 	keyInput.Font = Enum.Font.GothamMedium
 	keyInput.TextSize = 16
-	keyInput.PlaceholderText = "..."
 	keyInput.Text = ""
 	keyInput.ZIndex = 2
 	keyInput.Parent = keyFrame
@@ -515,26 +493,12 @@ function XenonLibrary:CreateWindow(Config)
 			frameCount = 0
 			lastTime = now
 
-			if fps >= 50 then
-				fpsLabel.TextColor3 = Color3.fromRGB(100, 255, 150)
-			elseif fps >= 25 then
-				fpsLabel.TextColor3 = Color3.fromRGB(255, 220, 50)
-			else
-				fpsLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-			end
+			fpsLabel.TextColor3 = fps >= 50 and Color3.fromRGB(100, 255, 150) or (fps >= 25 and Color3.fromRGB(255, 220, 50) or Color3.fromRGB(255, 80, 80))
 			fpsLabel.Text = ("FPS: %d"):format(fps)
 
-			local ok, ping = pcall(function()
-				return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-			end)
+			local ok, ping = pcall(function() return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
 			if ok then
-				if ping <= 80 then
-					pingLabel.TextColor3 = Color3.fromRGB(100, 255, 150)
-				elseif ping <= 150 then
-					pingLabel.TextColor3 = Color3.fromRGB(255, 220, 50)
-				else
-					pingLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-				end
+				pingLabel.TextColor3 = ping <= 80 and Color3.fromRGB(100, 255, 150) or (ping <= 150 and Color3.fromRGB(255, 220, 50) or Color3.fromRGB(255, 80, 80))
 				pingLabel.Text = ("Ping: %d ms"):format(ping)
 			else
 				pingLabel.Text = "Ping: --"
@@ -591,9 +555,7 @@ function XenonLibrary:CreateWindow(Config)
 	av.BackgroundTransparency = 1
 	av.Parent = profFrame
 	Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
-	pcall(function()
-		av.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-	end)
+	av.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
 
 	local nLabel = Instance.new("TextLabel")
 	nLabel.Size = UDim2.new(1, -55, 1, 0)
@@ -607,35 +569,27 @@ function XenonLibrary:CreateWindow(Config)
 	nLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	nLabel.Parent = profFrame
 
-	local profBtn = Instance.new("TextButton")
+	local isPExp = false
+	local profBtn = Instance.new("TextButton", profFrame)
 	profBtn.Size = UDim2.new(1, 0, 1, 0)
 	profBtn.BackgroundTransparency = 1
 	profBtn.Text = ""
-	profBtn.Parent = profFrame
-
-	local isPExp = false
 	profBtn.MouseButton1Click:Connect(function()
 		isPExp = not isPExp
 		if isPExp then
 			nLabel.TextTruncate = Enum.TextTruncate.None
-			profFrame.ZIndex = 15
-			nLabel.ZIndex = 16
-			av.ZIndex = 16
+			profFrame.ZIndex = 15; nLabel.ZIndex = 16; av.ZIndex = 16
 			TweenService:Create(profFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-				Size = UDim2.new(1, 100, 0, 50),
-				BackgroundTransparency = 0.2,
+				Size = UDim2.new(1, 100, 0, 50), BackgroundTransparency = 0.2
 			}):Play()
 		else
 			TweenService:Create(profFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-				Size = UDim2.new(1, -20, 0, 50),
-				BackgroundTransparency = 0.5,
+				Size = UDim2.new(1, -20, 0, 50), BackgroundTransparency = 0.5
 			}):Play()
 			task.delay(0.3, function()
 				if not isPExp then
 					nLabel.TextTruncate = Enum.TextTruncate.AtEnd
-					profFrame.ZIndex = 5
-					nLabel.ZIndex = 6
-					av.ZIndex = 6
+					profFrame.ZIndex = 5; nLabel.ZIndex = 6; av.ZIndex = 6
 				end
 			end)
 		end
@@ -647,23 +601,17 @@ function XenonLibrary:CreateWindow(Config)
 		openBtn.Visible = true
 		register(openBtn, "Text", "openHub")
 		applyLocalization()
-		TweenService:Create(openBtn, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Position = UDim2.new(0.5, 0, 0, 15),
-		}):Play()
+		TweenService:Create(openBtn, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0.5, 0, 0, 15) }):Play()
 	end
 
 	local function showKeyFrame()
 		keyFrame.Visible = true
 		keyFrame.Size = UDim2.new(0, 0, 0, 0)
-		TweenService:Create(keyFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Size = UDim2.new(0, 400, 0, 240),
-		}):Play()
+		TweenService:Create(keyFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 400, 0, 240) }):Play()
 	end
 
 	local function hideLangFrame()
-		TweenService:Create(langFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-			Size = UDim2.new(0, 0, 0, 0),
-		}):Play()
+		TweenService:Create(langFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2.new(0, 0, 0, 0) }):Play()
 		task.wait(0.5)
 		langFrame.Visible = false
 	end
@@ -671,22 +619,11 @@ function XenonLibrary:CreateWindow(Config)
 	local function afterLanguageChosen()
 		applyLocalization()
 		hideLangFrame()
-		if not KeySystem then
-			showOpenBtn()
-		else
-			showKeyFrame()
-		end
+		if not KeySystem then showOpenBtn() else showKeyFrame() end
 	end
 
-	ruBtn.MouseButton1Click:Connect(function()
-		XenonLibrary._lang = "RU"
-		afterLanguageChosen()
-	end)
-
-	enBtn.MouseButton1Click:Connect(function()
-		XenonLibrary._lang = "EN"
-		afterLanguageChosen()
-	end)
+	ruBtn.MouseButton1Click:Connect(function() XenonLibrary._lang = "RU"; afterLanguageChosen() end)
+	enBtn.MouseButton1Click:Connect(function() XenonLibrary._lang = "EN"; afterLanguageChosen() end)
 
 	getKeyBtn.MouseButton1Click:Connect(function()
 		if setclipboard then setclipboard(KeyLink) end
@@ -700,11 +637,8 @@ function XenonLibrary:CreateWindow(Config)
 			keyInput.Text = L("correct")
 			keyInput.TextColor3 = Color3.fromRGB(50, 255, 50)
 			TweenService:Create(keyStroke, TweenInfo.new(0.3), { Color = Color3.fromRGB(50, 255, 50), Transparency = 0 }):Play()
-
 			task.wait(0.5)
-			TweenService:Create(keyFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-				Size = UDim2.new(0, 0, 0, 0),
-			}):Play()
+			TweenService:Create(keyFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2.new(0, 0, 0, 0) }):Play()
 			task.wait(0.5)
 			keyFrame.Visible = false
 			showOpenBtn()
@@ -713,7 +647,6 @@ function XenonLibrary:CreateWindow(Config)
 			keyInput.TextColor3 = Color3.fromRGB(255, 50, 50)
 			TweenService:Create(keyStroke, TweenInfo.new(0.3), { Color = Color3.fromRGB(255, 50, 50), Transparency = 0 }):Play()
 			shakeWindow(keyFrame)
-
 			task.wait(0.5)
 			keyInput.Text = ""
 			keyInput.TextColor3 = theme.text
@@ -728,95 +661,52 @@ function XenonLibrary:CreateWindow(Config)
 			register(openBtn, "Text", "closeHub")
 			applyLocalization()
 			mainFrame.Size = UDim2.new(0, 0, 0, 0)
-			TweenService:Create(mainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-				Size = UDim2.new(0, 650, 0, 420),
-			}):Play()
+			TweenService:Create(mainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 650, 0, 420) }):Play()
 		else
 			register(openBtn, "Text", "openHub")
 			applyLocalization()
-			local tw = TweenService:Create(mainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-				Size = UDim2.new(0, 0, 0, 0),
-			})
+			local tw = TweenService:Create(mainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2.new(0, 0, 0, 0) })
 			tw:Play()
 			tw.Completed:Wait()
 			mainFrame.Visible = false
 		end
 	end)
 
-	local dragToggle = false
-	local dragSpeed = 0.15 
-	local dragInput = nil
-	local dragStart = nil
-	local startPos = nil
+	-- Drag Logic
+	local dragToggle, dragInput, dragStart, startPos = false, nil, nil, nil
 	local targetPos = nil
-
-	local function updateInput(input)
-		local delta = input.Position - dragStart
-		targetPos = UDim2.new(
-			startPos.X.Scale, startPos.X.Offset + delta.X,
-			startPos.Y.Scale, startPos.Y.Offset + delta.Y
-		)
-	end
 
 	topBar.InputBegan:Connect(function(input)
 		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-			dragToggle = true
-			dragStart = input.Position
-			startPos = mainFrame.Position
-			targetPos = startPos
-
-			input.Changed:Connect(function()
-				if (input.UserInputState == Enum.UserInputState.End) then
-					dragToggle = false
-				end
-			end)
+			dragToggle = true; dragStart = input.Position; startPos = mainFrame.Position; targetPos = startPos
+			input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragToggle = false end end)
 		end
 	end)
-
 	topBar.InputChanged:Connect(function(input)
-		if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			dragInput = input
-		end
+		if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then dragInput = input end
 	end)
-
 	UserInputService.InputChanged:Connect(function(input)
 		if (input == dragInput and dragToggle) then
-			updateInput(input)
+			local delta = input.Position - dragStart
+			targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 		end
 	end)
-
 	RunService.RenderStepped:Connect(function()
-		if targetPos then
-			mainFrame.Position = mainFrame.Position:Lerp(targetPos, dragSpeed)
-		end
+		if targetPos then mainFrame.Position = mainFrame.Position:Lerp(targetPos, 0.15) end
 	end)
 
+	-- API For Tabs
 	local firstTab = true
 	local allTabs, allPages = {}, {}
 
-	local function activateTab(idx, tabBtn, page)
-		for i, v in ipairs(allPages) do
-			v.Visible = false
-			TweenService:Create(allTabs[i], TweenInfo.new(0.3), {
-				BackgroundTransparency = 1,
-				TextColor3 = theme.dimText,
-			}):Play()
-		end
-		page.Visible = true
-		TweenService:Create(tabBtn, TweenInfo.new(0.3), {
-			BackgroundTransparency = 0.5,
-			TextColor3 = Color3.fromRGB(255, 255, 255),
-		}):Play()
-	end
-
-	function Window:CreateTab(tabKey)
+	function Window:CreateTab(tabName)
 		local Tab = {}
 
 		local tabBtn = Instance.new("TextButton")
 		tabBtn.Size = UDim2.new(1, -20, 0, 40)
 		tabBtn.BackgroundTransparency = 1
 		tabBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		tabBtn.Text = "  " .. L(tabKey)
+		tabBtn.Text = "  " .. L(tabName)
 		tabBtn.TextColor3 = theme.dimText
 		tabBtn.Font = Enum.Font.GothamSemibold
 		tabBtn.TextSize = 14
@@ -826,7 +716,8 @@ function XenonLibrary:CreateWindow(Config)
 		Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 		makeButtonPremium(tabBtn, nil, nil)
 		
-		register(tabBtn, "Text", { RU = "  " .. L(tabKey), EN = "  " .. L(tabKey) })
+		-- Если ключа нет в словаре, он просто отобразит текст, что передал пользователь
+		register(tabBtn, "Text", { RU = "  " .. L(tabName), EN = "  " .. L(tabName) })
 
 		local page = Instance.new("ScrollingFrame")
 		page.Size = UDim2.new(1, 0, 1, 0)
@@ -835,34 +726,34 @@ function XenonLibrary:CreateWindow(Config)
 		page.ScrollBarThickness = 0
 		page.BorderSizePixel = 0
 		page.Parent = pagesContainer
-
 		local pLayout = Instance.new("UIListLayout")
 		pLayout.Padding = UDim.new(0, 10)
-		pLayout.SortOrder = Enum.SortOrder.LayoutOrder
 		pLayout.Parent = page
-
 		local pPad = Instance.new("UIPadding")
-		pPad.PaddingTop = UDim.new(0, 20)
-		pPad.PaddingLeft = UDim.new(0, 20)
+		pPad.PaddingTop = UDim.new(0, 20); pPad.PaddingLeft = UDim.new(0, 20)
 		pPad.Parent = page
 
 		local title = Instance.new("TextLabel")
 		title.Size = UDim2.new(1, -40, 0, 40)
 		title.BackgroundTransparency = 1
-		title.Text = L(tabKey)
 		title.TextColor3 = theme.text
 		title.Font = Enum.Font.GothamBlack
 		title.TextSize = 32
 		title.TextXAlignment = Enum.TextXAlignment.Left
 		title.Parent = page
-		register(title, "Text", tabKey)
+		register(title, "Text", tabName)
 
 		table.insert(allTabs, tabBtn)
 		table.insert(allPages, page)
 
 		local idx = #allTabs
 		tabBtn.MouseButton1Click:Connect(function()
-			activateTab(idx, tabBtn, page)
+			for i, v in ipairs(allPages) do
+				v.Visible = false
+				TweenService:Create(allTabs[i], TweenInfo.new(0.3), { BackgroundTransparency = 1, TextColor3 = theme.dimText }):Play()
+			end
+			page.Visible = true
+			TweenService:Create(tabBtn, TweenInfo.new(0.3), { BackgroundTransparency = 0.5, TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
 		end)
 
 		if firstTab then
@@ -872,12 +763,12 @@ function XenonLibrary:CreateWindow(Config)
 			tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 		end
 
-		function Tab:CreateLabel(textKey)
+		-- API For Elements inside Tab
+		function Tab:CreateLabel(textValue)
 			local lbl = Instance.new("TextLabel")
 			lbl.Size = UDim2.new(0, 400, 0, 40)
 			lbl.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 			lbl.BackgroundTransparency = 0.8
-			lbl.Text = L(textKey)
 			lbl.TextColor3 = theme.text
 			lbl.Font = Enum.Font.GothamMedium
 			lbl.TextSize = 14
@@ -886,16 +777,15 @@ function XenonLibrary:CreateWindow(Config)
 			local lStroke = Instance.new("UIStroke", lbl)
 			lStroke.Color = Color3.fromRGB(255, 255, 255)
 			lStroke.Transparency = 0.8
-			register(lbl, "Text", textKey)
+			register(lbl, "Text", textValue)
 			return lbl
 		end
 
-		function Tab:CreateButton(textKey, callback, customColor)
+		function Tab:CreateButton(textValue, callback, customColor)
 			local btn = Instance.new("TextButton")
 			btn.Size = UDim2.new(0, 400, 0, 45)
 			btn.BackgroundColor3 = customColor or Color3.fromRGB(0, 0, 0)
 			btn.BackgroundTransparency = customColor and 0.2 or 0.6
-			btn.Text = L(textKey)
 			btn.TextColor3 = theme.text
 			btn.Font = Enum.Font.GothamMedium
 			btn.TextSize = 16
@@ -906,7 +796,7 @@ function XenonLibrary:CreateWindow(Config)
 			bStroke.Color = Color3.fromRGB(255, 255, 255)
 			bStroke.Transparency = 0.7
 			makeButtonPremium(btn, customColor and 0.1 or 0.4, customColor and 0.2 or 0.6)
-			register(btn, "Text", textKey)
+			register(btn, "Text", textValue)
 			
 			btn.MouseButton1Click:Connect(function()
 				if callback then pcall(callback, btn) end
@@ -940,83 +830,15 @@ function XenonLibrary:CreateWindow(Config)
 					lbl.Text = (XenonLibrary._t[XenonLibrary._lang].timeLabel):format(h, m, s)
 				end
 			end)
-
 			return lbl
 		end
 
 		return Tab
 	end
 
-	function Window:SetLanguage(newLang)
-		if newLang ~= "RU" and newLang ~= "EN" then return end
-		XenonLibrary._lang = newLang
-		applyLocalization()
-	end
-
 	applyLocalization()
 	return Window
 end
 
-
--------------------------------------------------------------------------
--- КОД ЗАПУСКА МЕНЮ 
--------------------------------------------------------------------------
-local Window = XenonLibrary:CreateWindow({
-    Name = "Xenon Hub and Salat Hub",
-    GameName = "Game", 
-    KeySystem = true, -- Система ключей включена
-    Key = "1",        -- Твой пароль
-    KeyLink = "https://discord.gg/WZp4DZ9QZs"
-})
-
--- Создаем вкладки
-local TabHome = Window:CreateTab("homeTab")
-local TabStats = Window:CreateTab("statsTab")
-local TabSettings = Window:CreateTab("settingsTab")
-
--- Наполнение вкладок
-TabHome:CreateLabel("homeWelcome")
-
-TabHome:CreateButton("discordBtn", function(btn)
-    local inviteCode = "WZp4DZ9QZs" 
-    local inviteLink = "https://discord.gg/" .. inviteCode
-
-    -- Авто-заход в Дискорд (только для ПК)
-    local req = (request or http_request or (syn and syn.request))
-    if req then
-        pcall(function()
-            req({
-                Url = "http://127.0.0.1:6463/rpc?v=1",
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json",
-                    ["Origin"] = "https://discord.com/"
-                },
-                Body = HttpService:JSONEncode({
-                    cmd = "INVITE_BROWSER",
-                    args = { code = inviteCode },
-                    nonce = HttpService:GenerateGUID(false)
-                })
-            })
-        end)
-    end
-
-    if setclipboard then 
-        setclipboard(inviteLink) 
-    end
-
-    local oldText = btn.Text
-    btn.Text = "JOINING..."
-    task.wait(1.5)
-    btn.Text = oldText
-
-end, Color3.fromRGB(88, 101, 242))
-
-TabStats:CreateTimerLabel()
-TabStats:CreateLabel("statsInfo")
-
-TabSettings:CreateButton("killChar", function()
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then hum.Health = 0 end
-end, Color3.fromRGB(200, 50, 50))
+-- ВОЗВРАЩАЕМ САМУ БИБЛИОТЕКУ!
+return XenonLibrary
